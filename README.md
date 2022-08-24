@@ -6,7 +6,7 @@ Simple fastapi skeleton for a stateless microservice (application for ml models,
 
 To run the service manually in debug mode install the required python dependencies:
 
- `pip install -r requirements.txt`
+ `poetry install`
 
 You can run the service in debug mode without gunicorn:
 
@@ -42,4 +42,4 @@ The user interface for the API is defined in `http://localhost:5000/docs` endpoi
 
 To run the tests:
 
-  `python -m pytest --verbose --cov=./`
+  `poetry run python -m pytest --verbose --cov=./`
