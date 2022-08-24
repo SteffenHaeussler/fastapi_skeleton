@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "fastapi_skeleton"
+version = "0.1.0"
+description = ""
+authors = ["Steffen <steffen.haeussler.work@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+fastapi = "^0.80.0"
+uvicorn = "^0.18.3"
+
+[tool.poetry.dev-dependencies]
+black = "^22.6.0"
+pytest = "^7.1.2"
+pytest-cov = "^3.0.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
