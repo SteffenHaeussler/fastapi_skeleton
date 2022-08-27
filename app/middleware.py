@@ -1,7 +1,13 @@
 import time
+import logging
+import uuid
 
 from fastapi import Request
-from loguru import logger
+
+from app.context import ctx_request_id
+
+
+logger = logging.getLogger()
 
 
 class RequestTimer:
@@ -16,4 +22,14 @@ class RequestTimer:
 
         logger.info(f"Processing this request took {process_time} seconds")
 
+        return response
+
+
+class RequestIdGenerator:
+    async def __call__(self, request: Request, call_next):
+        request_id = str(uuid.uuid4())
+
+        ctx_request_id.set(request_id)
+        response = await call_next(request)
+        response.headers["request_id"] = request_id
         return response

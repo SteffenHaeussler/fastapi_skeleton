@@ -1,12 +1,13 @@
 from time import time
+import logging
 
 from fastapi import APIRouter, Request
-from loguru import logger
 
 from . import errors
 
 
 core = APIRouter()
+logger = logging.getLogger()
 
 
 @core.get("/health")
