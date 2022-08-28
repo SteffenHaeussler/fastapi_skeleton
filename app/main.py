@@ -1,17 +1,15 @@
 # !/usr/bin/env python
-import logging
 import os
 
 from fastapi import FastAPI
+from loguru import logger
 
 from app.config import config
 from app.meta import tags_metadata
 from app.core import views as core_views
 from app.v1 import views as v1_view
-from app.middleware import RequestTimer, RequestIdGenerator
-
-
-logger = logging.getLogger()
+from app.logging import setup_logger
+from app.middleware import RequestTimer, add_request_id
 
 
 def get_application(config_name: str) -> FastAPI:
@@ -30,13 +28,12 @@ def get_application(config_name: str) -> FastAPI:
     -------
     """
     request_timer = RequestTimer()
-    request_id = RequestIdGenerator()
     application = FastAPI(openapi_tags=tags_metadata)
 
     application.state = config[config_name]
 
-    application.middleware("http")(request_id)
     application.middleware("http")(request_timer)
+    application.middleware("http")(add_request_id)
 
     application.include_router(core_views.core, tags=["core"])
 
@@ -48,5 +45,6 @@ def get_application(config_name: str) -> FastAPI:
 
 
 api_mode = os.getenv("FASTAPI_ENV") or "develop"
+setup_logger(config[api_mode])
 app = get_application(api_mode)
 

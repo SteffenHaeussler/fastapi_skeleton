@@ -1,13 +1,10 @@
 import time
-import logging
 import uuid
 
 from fastapi import Request
+from loguru import logger
 
 from app.context import ctx_request_id
-
-
-logger = logging.getLogger()
 
 
 class RequestTimer:
@@ -25,11 +22,9 @@ class RequestTimer:
         return response
 
 
-class RequestIdGenerator:
-    async def __call__(self, request: Request, call_next):
-        request_id = str(uuid.uuid4())
+async def add_request_id(request: Request, call_next):
+    ctx_request_id.set(uuid.uuid4().hex)
+    response = await call_next(request)
 
-        ctx_request_id.set(request_id)
-        response = await call_next(request)
-        response.headers["request_id"] = request_id
-        return response
+    response.headers["x-request-id"] = ctx_request_id.get()
+    return response

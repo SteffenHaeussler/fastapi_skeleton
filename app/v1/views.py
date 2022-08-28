@@ -1,12 +1,11 @@
 from time import time
-import logging
 
 from fastapi import APIRouter, Request
+from loguru import logger
 
 from app.v1.errors import *
 
 
-logger = logging.getLogger()
 v1 = APIRouter()
 
 
