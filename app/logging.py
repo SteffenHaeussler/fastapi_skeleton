@@ -2,16 +2,15 @@ import logging
 import json
 import sys
 
-from uvicorn.logging import DefaultFormatter
 from loguru import logger
-from loguru._defaults import LOGURU_FORMAT
 
 from app.context import ctx_request_id
 
 
 def request_id_filter(record):
-    record['request_id'] = ctx_request_id.get()
-    return record['request_id']
+    record["request_id"] = ctx_request_id.get()
+    return record["request_id"]
+
 
 class InterceptHandler(logging.Handler):
     """
@@ -37,7 +36,6 @@ class InterceptHandler(logging.Handler):
         )
 
 
-
 def sink_serializer(message):
     record = message.record
     simplified = {
@@ -61,7 +59,6 @@ def setup_logger(config_name, json_serialize=True):
     for uvicorn_logger in loggers:
         uvicorn_logger.handlers = [intercept_handler]
 
-
     if config_name == "prod":
         service_log_level = logging.ERROR
     elif config_name == "staging":
@@ -72,15 +69,25 @@ def setup_logger(config_name, json_serialize=True):
     if json_serialize:
 
         logger.configure(
-            handlers=[{"sink": sink_serializer, "level": service_log_level,
-                    "filter": request_id_filter}]
+            handlers=[
+                {
+                    "sink": sink_serializer,
+                    "level": service_log_level,
+                    "filter": request_id_filter,
+                }
+            ]
         )
 
     else:
         fmt = "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <red> {request_id} </red> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
 
         logger.configure(
-            handlers=[{"sink": sys.stdout, "level": service_log_level, "format": fmt,
-                    "filter": request_id_filter}])
-
-
+            handlers=[
+                {
+                    "sink": sys.stdout,
+                    "level": service_log_level,
+                    "format": fmt,
+                    "filter": request_id_filter,
+                }
+            ]
+        )

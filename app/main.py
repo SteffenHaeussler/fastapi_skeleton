@@ -47,4 +47,3 @@ def get_application(config_name: str) -> FastAPI:
 api_mode = os.getenv("FASTAPI_ENV") or "develop"
 setup_logger(config[api_mode])
 app = get_application(api_mode)
-
