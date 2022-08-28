@@ -1,87 +1,86 @@
 import logging
 import json
+import sys
 
-from fastapi import Request
 from uvicorn.logging import DefaultFormatter
+from loguru import logger
+from loguru._defaults import LOGURU_FORMAT
 
 from app.context import ctx_request_id
 
 
-class RequestIdFilter(logging.Filter):
-    """Logging filter to add request IDs to log records"""
+def request_id_filter(record):
+    record['request_id'] = ctx_request_id.get()
+    return record['request_id']
 
-    def __init__(self, param=None):
-        self.param = param
-
-    def filter(self, record) -> bool:
-        r_id = ctx_request_id.get()
-        record.request_id = r_id
-        return True
-
-
-class JsonFormatter(DefaultFormatter):
+class InterceptHandler(logging.Handler):
     """
-    https://stackoverflow.com/a/70223539
-
-
-    Formatter that outputs JSON strings after parsing the LogRecord.
-
-    Args:
-        - fmt_dict: Key: logging format attribute pairs. Defaults to {"message": "message"}.
-        - time_format: time.strftime() format string. Default: "%Y-%m-%dT%H:%M:%S"
-        - msec_format: Microsecond formatting. Appended at the end. Default: "%s.%03dZ"
+    Default handler from examples in loguru documentaion.
+    See https://loguru.readthedocs.io/en/stable/overview.html#entirely-compatible-with-standard-logging
     """
 
-    def __init__(
-        self,
-        fmt: dict = None,
-        time_format: str = "%Y-%m-%dT%H:%M:%S",
-        msec_format: str = "%s.%03dZ",
-    ):
+    def emit(self, record: logging.LogRecord):
+        # Get corresponding Loguru level if it exists
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
 
-        self.fmt_dict = fmt if fmt is not None else {"message": "message"}
-        self.default_time_format = time_format
-        self.default_msec_format = msec_format
-        self.datefmt = None
+        # Find caller from where originated the logged message
+        frame, depth = logging.currentframe(), 2
+        while frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
 
-    def usesTime(self) -> bool:
-        """
-        Overwritten to look for the attribute in the format dict values instead of the fmt string.
-        """
-        return "asctime" in self.fmt_dict.values()
+        logger.opt(depth=depth, exception=record.exc_info).log(
+            level, record.getMessage()
+        )
 
-    def formatMessage(self, record) -> dict:
-        """
-        Overwritten to return a dictionary of the relevant LogRecord attributes instead of a string.
-        KeyError is raised if an unknown attribute is provided in the fmt_dict.
-        """
-        return {
-            fmt_key: record.__dict__[fmt_val]
-            for fmt_key, fmt_val in self.fmt_dict.items()
-        }
 
-    def format(self, record) -> str:
-        """
-        Mostly the same as the parent's class method, the difference being that a dict is manipulated and dumped as JSON
-        instead of a string.
-        """
-        record.message = record.getMessage()
 
-        if self.usesTime():
-            record.asctime = self.formatTime(record, self.datefmt)
+def sink_serializer(message):
+    record = message.record
+    simplified = {
+        "level": record["level"].name,
+        "message": record["message"],
+        "timestamp": record["time"].timestamp(),
+        "request_id": record["request_id"],
+    }
+    serialized = json.dumps(simplified)
+    print(serialized, file=sys.stdout)
 
-        message_dict = self.formatMessage(record)
 
-        if record.exc_info:
-            if not record.exc_text:
-                record.exc_text = self.formatException(record.exc_info)
+def setup_logger(config_name, json_serialize=True):
+    intercept_handler = InterceptHandler()
 
-        if record.exc_text:
-            message_dict["exc_info"] = record.exc_text
+    loggers = (
+        logging.getLogger(name)
+        for name in logging.root.manager.loggerDict
+        if name.startswith("uvicorn.")
+    )
+    for uvicorn_logger in loggers:
+        uvicorn_logger.handlers = [intercept_handler]
 
-        if record.stack_info:
-            message_dict["stack_info"] = self.formatStack(record.stack_info)
 
-        return json.dumps(message_dict, default=str)
+    if config_name == "prod":
+        service_log_level = logging.ERROR
+    elif config_name == "staging":
+        service_log_level = logging.INFO
+    else:
+        service_log_level = logging.DEBUG
+
+    if json_serialize:
+
+        logger.configure(
+            handlers=[{"sink": sink_serializer, "level": service_log_level,
+                    "filter": request_id_filter}]
+        )
+
+    else:
+        fmt = "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <red> {request_id} </red> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+
+        logger.configure(
+            handlers=[{"sink": sys.stdout, "level": service_log_level, "format": fmt,
+                    "filter": request_id_filter}])
 
 
