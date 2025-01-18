@@ -4,7 +4,7 @@
 # Prepare base environment
 #############################
 
-FROM python:3.10-slim as base
+FROM python:3.12-slim as base
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG FASTAPI_ENV
@@ -32,19 +32,20 @@ ENV  PYTHONFAULTHANDLER=1 \
      PYTHONUNBUFFERED=1 \
      PIP_NO_CACHE_DIR=off \
      PIP_DISABLE_PIP_VERSION_CHECK=on \
-     PIP_DEFAULT_TIMEOUT=100 \
-     POETRY_VERSION=1.1.15
+     PIP_DEFAULT_TIMEOUT=100
 
 # RUN apt-get update -qq && apt-get install -qqy --no-install-recommends \
 #      python3-dev
 
-RUN pip install "poetry==$POETRY_VERSION"
+# Download the latest installer
+ADD https://astral.sh/uv/install.sh /uv-installer.sh
 
-COPY pyproject.toml .
-RUN poetry export -o requirements.txt
+# Run the installer then remove it
+RUN sh /uv-installer.sh && rm /uv-installer.sh
 
-RUN python -m venv .venv && \
-     .venv/bin/pip install -r requirements.txt
+# Sync the project into a new environment, using the frozen lockfile
+WORKDIR /app
+RUN uv sync --frozen
 
 ###########################
 # Install app dependencies
@@ -61,9 +62,9 @@ RUN rm -rf app/tests
 
 FROM base AS env
 
-ENV PATH=/app/.venv/bin:$PATH
+ENV PATH="/root/.local/bin/:$PATH"
 
-COPY --from=build-image /app/.venv /app/.venv
+COPY --from=build-image /app/.local /app/.local
 COPY --from=build-app /app /app
 
 EXPOSE 5000

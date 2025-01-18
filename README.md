@@ -1,22 +1,25 @@
 # fastapi_skeleton
-Simple fastapi skeleton for a stateless microservice (application for ml models, optimization, ...)
 
+Simple fastapi skeleton for a stateless microservice (application for ml models, optimization, ...)
 
 ## Running service manually
 
 To run the service manually in debug mode install the required python dependencies:
 
- `poetry install`
+`uv install`
 
-You can run the service in debug mode without gunicorn:
+You can run the service in debug mode:
 
-`./run_debug.sh`
+```
+export FASTAPI_ENV="dev"
+./run_app.sh
+```
 
 ## Running service in Docker
 
 To build the Docker image:
 
-`docker build -t "fastapi-api:latest" . --build-arg FASTAPI_ENV=develop`
+`docker build -t "fastapi-api:latest" . --build-arg FASTAPI_ENV=dev`
 
 To run the Docker image:
 
@@ -36,9 +39,8 @@ To check that the service is alive, run:
 
 The user interface for the API is defined in `http://localhost:5000/docs` endpoint.
 
-
 ## Testing
 
 To run the tests:
 
-  `poetry run python -m pytest --verbose --cov=./`
+`uv run python -m pytest --verbose --cov=./`

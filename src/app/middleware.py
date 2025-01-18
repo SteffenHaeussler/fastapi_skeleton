@@ -4,7 +4,7 @@ import uuid
 from fastapi import Request
 from loguru import logger
 
-from app.context import ctx_request_id
+from src.app.context import ctx_request_id
 
 
 class RequestTimer:
