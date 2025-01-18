@@ -3,19 +3,18 @@ from time import time
 from fastapi import APIRouter, Request
 from loguru import logger
 
-from . import errors
+from src.app.v1.errors import *
+
+v1 = APIRouter()
 
 
-core = APIRouter()
-
-
-@core.get("/health")
+@v1.get("/health")
 def health(request: Request):
     logger.debug(f"Methode: {request.method} on {request.url.path}")
     return {"version": request.app.state.VERSION, "timestamp": time()}
 
 
-@core.post("/health")
+@v1.post("/health")
 def health(request: Request):
     logger.debug(f"Methode: {request.method} on {request.url.path}")
     return {"version": request.app.state.VERSION, "timestamp": time()}

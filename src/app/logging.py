@@ -1,10 +1,10 @@
-import logging
 import json
+import logging
 import sys
 
 from loguru import logger
 
-from app.context import ctx_request_id
+from src.app.context import ctx_request_id
 
 
 def request_id_filter(record):
@@ -67,7 +67,6 @@ def setup_logger(config_name, json_serialize=True):
         service_log_level = logging.DEBUG
 
     if json_serialize:
-
         logger.configure(
             handlers=[
                 {

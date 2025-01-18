@@ -1,0 +1,17 @@
+VERSION = "0.1.0"
+
+[DEV]
+CONFIG_NAME = "dev"
+DEBUG = false
+
+[PROD]
+CONFIG_NAME = "prod"
+DEBUG = false
+
+[STAGE]
+CONFIG_NAME = "stage"
+DEBUG = false
+
+[TEST]
+CONFIG_NAME = "test"
+DEBUG = true
