@@ -16,7 +16,7 @@ class Deployment(BaseModel):
     DEBUG: bool
 
 
-class Settings(BaseSettings):
+class Config(BaseSettings):
     _toml_file: str = "config.toml"
 
     FASTAPI_ENV: constr(to_upper=True) = Field(default="DEV")
