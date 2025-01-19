@@ -1,3 +1,4 @@
+import importlib.metadata
 from pathlib import Path
 from typing import Tuple, Type
 
@@ -21,7 +22,7 @@ class Settings(BaseSettings):
     FASTAPI_ENV: constr(to_upper=True) = Field(default="DEV")
     BASEDIR: str = str(Path(__file__).resolve().parent)
     ROOTDIR: str = str(Path(__file__).resolve().parents[2])
-    VERSION: str
+    VERSION: str = importlib.metadata.version("fastapi_skeleton")
 
     DEV: Deployment
     PROD: Deployment

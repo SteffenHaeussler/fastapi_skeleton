@@ -2,7 +2,7 @@
 name = "fastapi_skeleton"
 version = "0.1.0"
 description = "fastapi_skeleton"
-authors = [{"name" = "Steffen Häußler", email = "steffen.haeussler.work@gmail.com"]
+authors = [{"name" = "Steffen Häußler", email = "steffen.haeussler.work@gmail.com"}]
 readme = "README.md"
 requires-python = ">=3.12.8"
 dependencies = [
