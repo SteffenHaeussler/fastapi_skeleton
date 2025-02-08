@@ -35,9 +35,17 @@ To check that the service is alive, run:
 
 `curl -X GET "http://localhost:5000/v1/health" -H  "accept: application/json"`
 
+For the websockets endpoint, run:
+
+`websocat ws://127.0.0.1:5000/ws/health`
+
+`websocat ws://127.0.0.1:5000/v1/ws/health`
+
+
 ## API Documentation
 
 The user interface for the API is defined in `http://localhost:5000/docs` endpoint.
+Be aware, that OpenAPI schema doesn't support websockets.
 
 ## Testing
 
