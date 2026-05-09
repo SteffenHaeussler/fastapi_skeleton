@@ -51,5 +51,5 @@ def get_application(config: Dict) -> FastAPI:
 Config._toml_file = f"{ROOTDIR}/config.toml"
 config = Config()
 
-setup_logger(config.api_mode)
+setup_logger(config.api_mode.CONFIG_NAME)
 app = get_application(config)

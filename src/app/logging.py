@@ -59,9 +59,9 @@ def setup_logger(config_name, json_serialize=True):
     for uvicorn_logger in loggers:
         uvicorn_logger.handlers = [intercept_handler]
 
-    if config_name == "prod":
+    if config_name == "PROD":
         service_log_level = logging.ERROR
-    elif config_name == "staging":
+    elif config_name == "STAGE":
         service_log_level = logging.INFO
     else:
         service_log_level = logging.DEBUG
