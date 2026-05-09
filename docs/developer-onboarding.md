@@ -92,6 +92,60 @@ make down
 Compose reads `.env` automatically when present. `PORT` changes the host port;
 the container still listens on port `5000`.
 
+## PR/update checklist
+
+Before opening or updating a PR, run the same checks that CI runs:
+
+```bash
+uv sync --locked --dev
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest --verbose --cov=./
+uv build
+```
+
+For changes that touch Docker, runtime configuration, health checks, or startup
+behavior, also smoke-test the service locally:
+
+```bash
+make docker-build
+make up
+curl -X GET "http://localhost:5000/health/live" -H "accept: application/json"
+curl -X GET "http://localhost:5000/health/ready" -H "accept: application/json"
+make down
+```
+
+`make test` and `make lint` are useful shortcuts, but CI uses the exact
+commands above from `.github/workflows/ci.yml`; the Makefile shortcuts do not
+cover the package build or ruff format check.
+
+### Dependency updates
+
+Use `uv` as the source of truth for dependency changes:
+
+```bash
+uv add <package>                 # runtime dependency
+uv add --dev <package>           # development-only dependency
+uv lock --upgrade-package <name> # targeted upgrade
+uv lock --upgrade                # broad upgrade, only when intentional
+uv lock --check
+uv sync --locked --dev
+```
+
+Commit `pyproject.toml` and `uv.lock` together whenever dependencies change.
+Do not hand-edit `uv.lock` or use `pip install` as the dependency source of
+truth.
+
+### Common gotchas
+
+- `make format` rewrites files. Use `uv run ruff format --check .` when
+  verifying a PR without changing the worktree.
+- The Docker runtime image installs production dependencies only. Packages
+  needed for tests, linting, or local tooling belong in the dev dependency
+  group.
+- `FASTAPI_ENV` must resolve to one of `DEV`, `STAGE`, `PROD`, or `TEST`.
+  Docker Compose defaults to `DEV` when `.env` does not override it.
+
 ## Add a new endpoint
 
 1. Add request and response models near the API version that owns the route,
