@@ -11,9 +11,18 @@ from pydantic_settings import (
 )
 
 
+class CORSConfig(BaseModel):
+    enabled: bool = False
+    allow_origins: list[str] = Field(default_factory=list)
+    allow_methods: list[str] = Field(default_factory=lambda: ["GET", "POST"])
+    allow_headers: list[str] = Field(default_factory=lambda: ["*"])
+    allow_credentials: bool = False
+
+
 class Deployment(BaseModel):
     CONFIG_NAME: constr(to_upper=True)
     DEBUG: bool
+    cors: CORSConfig = Field(default_factory=CORSConfig)
 
 
 class Config(BaseSettings):
