@@ -118,6 +118,73 @@ def echo(payload: EchoRequest) -> EchoResponse:
     return EchoResponse(message=payload.message)
 ```
 
+## Handle errors
+
+All HTTP error responses are wrapped by the handlers in `src/app/errors.py`.
+The shared envelope has this shape:
+
+```json
+{
+  "error": "snake_case_code",
+  "message": "client-safe message",
+  "status": 400,
+  "request_id": "request-id",
+  "details": null
+}
+```
+
+Use FastAPI `HTTPException` for direct HTTP protocol failures inside route
+handlers, such as bad input, forbidden access, or a missing resource when no
+domain-specific exception exists.
+
+```python
+from fastapi import HTTPException
+
+
+@v1.get("/items/{item_id}", response_model=ItemResponse)
+async def get_item(item_id: str, client: SomeClientDep) -> ItemResponse:
+    item = await client.get(item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="item not found")
+    return ItemResponse.model_validate(item)
+```
+
+Use `APIException` subclasses for app or domain errors that should keep a
+stable status code, error code, optional details, and client-safe message.
+
+```python
+from src.app.errors import APIException
+
+
+class ItemUnavailable(APIException):
+    status_code = 409
+    error_code = "item_unavailable"
+
+
+@v1.post("/items/{item_id}/reserve", response_model=ItemResponse)
+async def reserve_item(item_id: str, client: SomeClientDep) -> ItemResponse:
+    item = await client.reserve(item_id)
+    if item is None:
+        raise ItemUnavailable(
+            "item cannot be reserved",
+            details={"item_id": item_id},
+        )
+    return ItemResponse.model_validate(item)
+```
+
+Do not rely on raw exception messages as user-facing output. Unexpected
+exceptions are logged with the request ID and returned as a sanitized 500:
+
+```json
+{
+  "error": "internal_server_error",
+  "message": "Internal server error",
+  "status": 500,
+  "request_id": "request-id",
+  "details": null
+}
+```
+
 ## Add a shared resource
 
 Use the lifespan state for clients that need startup or shutdown, such as
