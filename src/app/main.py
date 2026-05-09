@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from src.app.config import Config
@@ -38,6 +39,16 @@ def get_application(config: Dict) -> FastAPI:
 
     for key in config.model_fields:
         setattr(application.state, key, getattr(config, key))
+
+    cors = config.api_mode.cors
+    if cors.enabled:
+        application.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors.allow_origins,
+            allow_methods=cors.allow_methods,
+            allow_headers=cors.allow_headers,
+            allow_credentials=cors.allow_credentials,
+        )
 
     application.middleware("http")(request_timer)
     application.middleware("http")(add_request_id)
