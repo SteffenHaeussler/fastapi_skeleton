@@ -3,10 +3,13 @@ from pathlib import Path
 from typing import Dict
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from src.app.config import Config
 from src.app.core import router as core_router
+from src.app.errors import register_exception_handlers
+from src.app.lifespan import lifespan
 from src.app.logging import setup_logger
 from src.app.meta import tags_metadata
 from src.app.middleware import RequestTimer, add_request_id
@@ -32,12 +35,25 @@ def get_application(config: Dict) -> FastAPI:
     -------
     """
     request_timer = RequestTimer()
-    application = FastAPI(openapi_tags=tags_metadata)
+    application = FastAPI(lifespan=lifespan, openapi_tags=tags_metadata)
 
-    application.state = config
+    for key in config.model_fields:
+        setattr(application.state, key, getattr(config, key))
+    application.state.api_mode = config.api_mode
+
+    cors = config.api_mode.cors
+    if cors.enabled:
+        application.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors.allow_origins,
+            allow_methods=cors.allow_methods,
+            allow_headers=cors.allow_headers,
+            allow_credentials=cors.allow_credentials,
+        )
 
     application.middleware("http")(request_timer)
     application.middleware("http")(add_request_id)
+    register_exception_handlers(application)
 
     application.include_router(core_router.core, tags=["core"])
 

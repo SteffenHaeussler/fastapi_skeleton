@@ -44,7 +44,10 @@ def sink_serializer(message):
         "timestamp": record["time"].timestamp(),
         "request_id": record["request_id"],
     }
-    serialized = json.dumps(simplified)
+    for key, value in record["extra"].items():
+        if key not in simplified:
+            simplified[key] = value
+    serialized = json.dumps(simplified, default=str)
     print(serialized, file=sys.stdout)
 
 

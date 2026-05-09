@@ -9,22 +9,38 @@ from src.app.context import ctx_request_id
 
 class RequestTimer:
     async def __call__(self, request: Request, call_next):
-        logger.info("Incoming request")
-        start_time = time.time()
+        start_time = time.perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception:
+            duration_ms = (time.perf_counter() - start_time) * 1000.0
+            logger.bind(
+                method=request.method,
+                path=request.url.path,
+                status=500,
+                duration_ms=round(duration_ms, 3),
+                request_id=ctx_request_id.get(),
+            ).exception("request")
+            raise
 
-        response = await call_next(request)
-
-        process_time = time.time() - start_time
-        response.headers["X-Process-Time"] = str(process_time)
-
-        logger.info(f"Processing this request took {process_time} seconds")
+        duration_ms = (time.perf_counter() - start_time) * 1000.0
+        response.headers["X-Process-Time"] = str(duration_ms / 1000.0)
+        logger.bind(
+            method=request.method,
+            path=request.url.path,
+            status=response.status_code,
+            duration_ms=round(duration_ms, 3),
+            request_id=ctx_request_id.get(),
+        ).info("request")
 
         return response
 
 
 async def add_request_id(request: Request, call_next):
-    ctx_request_id.set(uuid.uuid4().hex)
+    incoming = request.headers.get("x-request-id")
+    request_id = incoming if incoming else uuid.uuid4().hex
+    ctx_request_id.set(request_id)
     response = await call_next(request)
 
-    response.headers["x-request-id"] = ctx_request_id.get()
+    response.headers["X-Request-ID"] = request_id
     return response
