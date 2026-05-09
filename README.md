@@ -6,7 +6,7 @@ Simple fastapi skeleton for a stateless microservice (application for ml models,
 
 To run the service manually in debug mode install the required python dependencies:
 
-`uv install`
+`uv sync`
 
 You can run the service in debug mode:
 
@@ -15,11 +15,19 @@ export FASTAPI_ENV="dev"
 ./run_app.sh
 ```
 
+Or via the Makefile:
+
+```
+make run
+```
+
 ## Running service in Docker
 
 To build the Docker image:
 
-`docker build -t "fastapi-api:latest" . --build-arg FASTAPI_ENV=dev`
+`make docker-build`
+
+(equivalent to `docker build -t "fastapi-api:latest" . --build-arg FASTAPI_ENV=dev`)
 
 To run the Docker image:
 
@@ -51,4 +59,17 @@ Be aware, that OpenAPI schema doesn't support websockets.
 
 To run the tests:
 
-`uv run python -m pytest --verbose --cov=./`
+`make test`
+
+(equivalent to `uv run python -m pytest --verbose --cov=./`)
+
+## Lint and format
+
+```
+make lint
+make format
+```
+
+## Available make targets
+
+Run `make help` to see all available targets.
