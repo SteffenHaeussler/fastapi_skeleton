@@ -172,3 +172,116 @@ Test override:
 ```python
 app.dependency_overrides[get_some_client] = lambda: fake_client
 ```
+
+## Request lifecycle
+
+Every HTTP request flows through a fixed chain of middleware before it reaches
+a route, and through the same chain in reverse on the way out. Starlette runs
+the **last-added middleware first**, so the effective wrap order set up in
+`src/app/main.py:46-58` is:
+
+```
+client → add_request_id → RequestTimer → prometheus_middleware → CORSMiddleware → route
+```
+
+### Request ID
+
+`add_request_id` (`src/app/middleware.py:52`) reads the incoming
+`x-request-id` header or generates a fresh `uuid4().hex`. It stores the id on
+`request.state.request_id` and in the `ctx_request_id` ContextVar
+(`src/app/context.py`) so any code — including the log sink — can read it
+without threading the request through. The same id is echoed back as
+`X-Request-ID` on every response, including error responses.
+
+### Timing and request log
+
+`RequestTimer` (`src/app/middleware.py:21`) measures wall time around
+`call_next`, sets an `X-Process-Time` header (in seconds), and emits one
+structured JSON log line per request:
+
+```
+method, path, status, duration_ms, request_id, trace_id, span_id
+```
+
+The JSON sink lives in `src/app/logging.py:39`. `trace_id` and `span_id` are
+populated from the active OTel span when tracing is enabled. On unhandled
+exceptions the timer logs `status=500` and re-raises so the registered
+exception handlers still run.
+
+### Error envelope
+
+All errors return the same JSON shape (`ErrorResponse` in
+`src/app/errors.py:12`):
+
+```json
+{
+  "error": "validation_error",
+  "message": "Request validation failed",
+  "status": 422,
+  "request_id": "…",
+  "details": { "errors": [...] }
+}
+```
+
+Four handlers are registered in `register_exception_handlers`:
+
+- `HTTPException` — `error` is the snake-cased status phrase.
+- `RequestValidationError` — `error="validation_error"`, status 422,
+  `details.errors` from pydantic.
+- `APIException` — the project's base class for app-specific errors. Subclass
+  it to add domain errors:
+
+  ```python
+  from src.app.errors import APIException
+
+
+  class ItemNotFound(APIException):
+      status_code = 404
+      error_code = "item_not_found"
+  ```
+
+- Bare `Exception` — logs the traceback and returns a generic 500 with no
+  internal detail.
+
+`_envelope` always sets `X-Request-ID` and re-applies CORS headers, because
+FastAPI exception responses bypass `CORSMiddleware`.
+
+### CORS
+
+CORS is driven by `config.api_mode.cors` in `config.toml`. The middleware is
+only added when `cors.enabled` is true (`src/app/main.py:46-54`); origins,
+methods, headers, and credentials all come from config. Error responses
+re-emit the matching headers manually so cross-origin clients still see the
+JSON envelope.
+
+### Observability hooks
+
+`configure_observability` (`src/app/observability.py`) is called before routes
+are mounted and toggles two independent features from the config block:
+
+- **Prometheus** — registers a private `CollectorRegistry` with
+  `http_requests_total` (Counter) and `http_request_duration_seconds`
+  (Histogram), both labelled `(method, path, status)` where `path` is the
+  matched route template to bound cardinality. Exposes the registry at the
+  configured `metrics` path (default `/metrics`), excluded from OpenAPI.
+- **OTel tracing** — installs a `TracerProvider` with `service.name` from
+  config (only if one isn't already set) and calls
+  `FastAPIInstrumentor().instrument_app(app)`, producing one span per
+  request. The request log automatically picks up `trace_id`/`span_id`.
+
+### Routing
+
+`src/app/main.py:60-62` mounts:
+
+- `core_router.core` at the root with tag `core` —
+  `/health`, `/health/live`, `/health/ready`, `/ws/health`.
+- `v1_router.v1` at `/v1` with tag `v1` — versioned health surface; this is
+  where new versioned endpoints belong.
+
+Tag metadata for the docs comes from `src/app/meta.py` via `openapi_tags`.
+
+`/health/ready` (`src/app/core/router.py`) runs every check appended to
+`app.state.readiness_checks` concurrently with `asyncio.gather` and returns
+503 if any return false or raise. Websocket endpoints accept the connection,
+push a `HealthCheckResponse` every 10 seconds, and log
+`event="websocket.disconnect"` with the close code on disconnect.
