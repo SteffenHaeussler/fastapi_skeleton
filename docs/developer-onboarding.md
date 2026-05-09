@@ -154,13 +154,15 @@ truth.
 
 ## Add a new endpoint
 
-1. Add request and response models near the API version that owns the route,
-   usually in `src/app/v1/schema.py`.
-2. Add the route in `src/app/v1/router.py` using the shared `v1` router.
-3. Always set `response_model` so FastAPI validates and documents the response.
-4. Add focused tests for the route behavior and validation.
+Use the API version that owns the route. For most new application endpoints,
+that means adding schemas in `src/app/v1/schema.py`, adding the route in
+`src/app/v1/router.py`, and testing the public `/v1/...` path.
 
-Example:
+### 1. Add request and response schemas
+
+Define the request and response models near the API version that owns the
+route. Keep response models explicit so callers, tests, and OpenAPI all agree
+on the shape of the endpoint.
 
 ```python
 from pydantic import BaseModel
@@ -174,10 +176,65 @@ class EchoResponse(BaseModel):
     message: str
 ```
 
+### 2. Import the schemas in the router
+
+Import the new models in `src/app/v1/router.py` alongside the existing versioned
+schemas.
+
+```python
+from src.app.v1.schema import EchoRequest, EchoResponse, HealthCheckResponse
+```
+
+### 3. Add the route with a `response_model`
+
+Add the route to the shared `v1` router. Always set `response_model` so FastAPI
+validates the returned data and includes the response shape in OpenAPI.
+
 ```python
 @v1.post("/echo", response_model=EchoResponse)
 def echo(payload: EchoRequest) -> EchoResponse:
     return EchoResponse(message=payload.message)
+```
+
+Returning an `EchoResponse` instance is the clearest option. Returning a
+compatible `dict` also works, but `response_model` still controls the public
+response body.
+
+### 4. Add focused `TestClient` tests
+
+Put endpoint tests in a focused test module, for example `tests/test_echo.py`.
+Test the success path, request validation, and the public response shape.
+
+```python
+from fastapi.testclient import TestClient
+
+from src.app.main import app
+
+
+def test_echo_returns_message():
+    with TestClient(app) as client:
+        response = client.post("/v1/echo", json={"message": "hello"})
+
+    assert response.status_code == 200
+    assert response.json() == {"message": "hello"}
+
+
+def test_echo_rejects_invalid_payload():
+    with TestClient(app) as client:
+        response = client.post("/v1/echo", json={})
+
+    assert response.status_code == 422
+
+
+def test_echo_response_shape_contains_only_response_fields():
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/echo",
+            json={"message": "hello", "ignored": "not in schema"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"message": "hello"}
 ```
 
 ## Handle errors
