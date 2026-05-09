@@ -132,18 +132,54 @@ database pools, HTTP clients, or model clients.
 5. Expose the resource through `src/app/dependencies.py`.
 6. In tests, override the dependency factory with `app.dependency_overrides`.
 
-Lifespan pattern:
+Pseudo-DB example:
 
-```python
-client = SomeClient(...)
-await client.connect()
+Use this as a copyable starting point for a real database pool/session/client.
+`DatabaseClient` is pseudo-code; replace it with the concrete type and methods
+from the database library used by your service.
 
-app.state.resources.some = client
-app.state._closers.append(client.aclose)
-app.state.readiness_checks.append(("some", client.ping))
+Configuration:
+
+```toml
+[DEV]
+CONFIG_NAME = "dev"
+DEBUG = false
+# database_url = "postgresql://app:secret@localhost:5432/app"
 ```
 
-Dependency pattern:
+When turning this into real code, add the matching field to the config model
+before reading `app.state.api_mode.database_url`.
+
+Lifespan setup:
+
+```python
+from contextlib import asynccontextmanager
+from types import SimpleNamespace
+
+from fastapi import FastAPI
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.resources = SimpleNamespace()
+    app.state.readiness_checks = []
+    app.state._closers = []
+
+    db = DatabaseClient(app.state.api_mode.database_url)
+    await db.connect()
+
+    app.state.resources.db = db
+    app.state._closers.append(db.aclose)
+    app.state.readiness_checks.append(("db", db.ping))
+
+    try:
+        yield
+    finally:
+        for closer in reversed(app.state._closers):
+            await closer()
+```
+
+Dependency factory:
 
 ```python
 from typing import Annotated
@@ -151,26 +187,43 @@ from typing import Annotated
 from fastapi import Depends, Request
 
 
-def get_some_client(request: Request) -> SomeClient:
-    return request.app.state.resources.some
+def get_db(request: Request) -> DatabaseClient:
+    return request.app.state.resources.db
 
 
-SomeClientDep = Annotated[SomeClient, Depends(get_some_client)]
+DBDep = Annotated[DatabaseClient, Depends(get_db)]
 ```
 
 Router usage:
 
 ```python
 @v1.get("/items/{item_id}", response_model=ItemResponse)
-async def get_item(item_id: str, client: SomeClientDep) -> ItemResponse:
-    item = await client.get(item_id)
+async def get_item(item_id: str, db: DBDep) -> ItemResponse:
+    item = await db.fetch_item(item_id)
     return ItemResponse.model_validate(item)
 ```
 
 Test override:
 
 ```python
-app.dependency_overrides[get_some_client] = lambda: fake_client
+from fastapi.testclient import TestClient
+
+from src.app.dependencies import get_db
+from src.app.main import app
+
+
+def test_get_item_uses_db_override():
+    fake_db = FakeDatabaseClient(items={"abc": {"id": "abc", "name": "Example"}})
+    app.dependency_overrides[get_db] = lambda: fake_db
+
+    try:
+        with TestClient(app) as client:
+            response = client.get("/v1/items/abc")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert response.json() == {"id": "abc", "name": "Example"}
 ```
 
 ## Request lifecycle
