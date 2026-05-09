@@ -10,9 +10,6 @@ dependencies = [
     "httpx>=0.28.1",
     "loguru>=0.7.3",
     "pydantic-settings>=2.7.1",
-    "pytest>=8.3.4",
-    "pytest-cov>=6.0.0",
-    "ruff>=0.9.2",
     "uvicorn[standard]>=0.34.0",
     "websockets>=14.2",
 ]
@@ -44,6 +41,7 @@ pythonpath = ["."]
 dev = [
     "pytest>=8.3.4",
     "pytest-cov>=6.0.0",
+    "ruff>=0.9.2",
 ]
 
 [tool.ruff]

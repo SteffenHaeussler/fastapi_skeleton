@@ -1,73 +1,77 @@
-# syntax=docker/dockerfile:1.2
+# syntax=docker/dockerfile:1.7
 
 #############################
-# Prepare base environment
+# Shared deps layer (prod deps only, no project, no dev).
 #############################
+FROM python:3.12-slim AS deps
 
-FROM python:3.12-slim as base
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
-ARG DEBIAN_FRONTEND=noninteractive
-ARG FASTAPI_ENV
-
-ENV LC_ALL=C.UTF-8
-ENV LANG=C.UTF-8
-ENV FASTAPI_ENV=${FASTAPI_ENV}
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-     build-essential \
-     && rm -rf /var/lib/apt/lists/*
-
-RUN apt-get clean
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=0
 
 WORKDIR /app
 
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-install-project --no-dev
 
-###########################
-# Install Python dependencies
-###########################
+#############################
+# Production build — installs the project on top of prod deps.
+#############################
+FROM deps AS build-prod
 
-FROM base as build-image
+COPY src ./src
+COPY run_app.sh config.toml README.md ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
-ENV  PYTHONFAULTHANDLER=1 \
-     PYTHONUNBUFFERED=1 \
-     PIP_NO_CACHE_DIR=off \
-     PIP_DISABLE_PIP_VERSION_CHECK=on \
-     PIP_DEFAULT_TIMEOUT=100
+#############################
+# Test build — adds dev deps and tests on top of the same prod deps layer.
+#############################
+FROM deps AS build-test
 
-# RUN apt-get update -qq && apt-get install -qqy --no-install-recommends \
-#      python3-dev
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-install-project
 
-# Download the latest installer
-ADD https://astral.sh/uv/install.sh /uv-installer.sh
+COPY src ./src
+COPY tests ./tests
+COPY run_app.sh ruff.toml config.toml README.md ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen
 
-# Run the installer then remove it
-RUN sh /uv-installer.sh && rm /uv-installer.sh
+#############################
+# Test runtime — built with `docker build --target test ...`.
+#############################
+FROM python:3.12-slim AS test
 
-# Sync the project into a new environment, using the frozen lockfile
+ENV LC_ALL=C.UTF-8 \
+    LANG=C.UTF-8 \
+    PATH="/app/.venv/bin:$PATH" \
+    FASTAPI_ENV=TEST
+
 WORKDIR /app
-RUN uv sync --frozen
 
-###########################
-# Install app dependencies
-###########################
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+COPY --from=build-test /app /app
 
-FROM base AS build-app
-
-COPY . /app
-RUN rm -rf app/tests
+ENTRYPOINT ["bash", "./run_app.sh"]
 
 #############################
-# Prepare runtime environment
+# Runtime (prod) — default target (last stage). Lean: prod deps + project only.
 #############################
+FROM python:3.12-slim AS runtime
 
-FROM base AS env
+ENV LC_ALL=C.UTF-8 \
+    LANG=C.UTF-8 \
+    PATH="/app/.venv/bin:$PATH"
 
-ENV PATH="/root/.local/bin/:$PATH"
+WORKDIR /app
 
-COPY --from=build-image /app/.local /app/.local
-COPY --from=build-app /app /app
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+COPY --from=build-prod /app /app
 
 EXPOSE 5000
 
 ENTRYPOINT ["bash", "./run_app.sh"]
-
