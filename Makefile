@@ -1,4 +1,4 @@
-.PHONY: help install test lint format run docker-build
+.PHONY: help install test lint format run docker-build up down
 
 IMAGE ?= fastapi-api:latest
 FASTAPI_ENV ?= dev
@@ -24,3 +24,9 @@ run: ## Run the service locally
 
 docker-build: ## Build the production Docker image
 	docker build -t "$(IMAGE)" . --build-arg FASTAPI_ENV=$(FASTAPI_ENV)
+
+up: ## Run the service with Docker Compose
+	docker compose up --build
+
+down: ## Stop Docker Compose services
+	docker compose down
