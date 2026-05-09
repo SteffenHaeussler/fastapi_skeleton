@@ -19,10 +19,26 @@ class CORSConfig(BaseModel):
     allow_credentials: bool = False
 
 
+class PrometheusConfig(BaseModel):
+    enabled: bool = False
+    path: str = "/metrics"
+
+
+class TracingConfig(BaseModel):
+    enabled: bool = False
+    service_name: str = "fastapi_skeleton"
+
+
+class ObservabilityConfig(BaseModel):
+    prometheus: PrometheusConfig = Field(default_factory=PrometheusConfig)
+    tracing: TracingConfig = Field(default_factory=TracingConfig)
+
+
 class Deployment(BaseModel):
     CONFIG_NAME: constr(to_upper=True)
     DEBUG: bool
     cors: CORSConfig = Field(default_factory=CORSConfig)
+    observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig)
 
 
 class Config(BaseSettings):
@@ -46,7 +62,9 @@ class Config(BaseSettings):
     def validate_fastapi_env(cls, value: str) -> str:
         if value not in cls.VALID_FASTAPI_ENVS:
             expected = ", ".join(cls.VALID_FASTAPI_ENVS)
-            raise ValueError(f"Invalid FASTAPI_ENV {value!r}. Expected one of: {expected}")
+            raise ValueError(
+                f"Invalid FASTAPI_ENV {value!r}. Expected one of: {expected}"
+            )
         return value
 
     @classmethod

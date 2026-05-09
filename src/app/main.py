@@ -13,6 +13,7 @@ from src.app.lifespan import lifespan
 from src.app.logging import setup_logger
 from src.app.meta import tags_metadata
 from src.app.middleware import RequestTimer, add_request_id
+from src.app.observability import configure_observability
 from src.app.v1 import router as v1_router
 
 BASEDIR = Path(__file__).resolve().parent
@@ -36,6 +37,7 @@ def get_application(config: Dict) -> FastAPI:
     """
     request_timer = RequestTimer()
     application = FastAPI(lifespan=lifespan, openapi_tags=tags_metadata)
+    configure_observability(application, config.api_mode)
 
     for key in config.model_fields:
         setattr(application.state, key, getattr(config, key))

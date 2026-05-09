@@ -10,6 +10,13 @@ DEBUG = false
 # allow_methods = ["GET", "POST"]
 # allow_headers = ["*"]
 # allow_credentials = false
+# Optional observability hooks are disabled unless enabled per deployment:
+# [DEV.observability.prometheus]
+# enabled = true
+# path = "/metrics"
+# [DEV.observability.tracing]
+# enabled = true
+# service_name = "fastapi_skeleton"
 
 [PROD]
 CONFIG_NAME = "prod"
