@@ -7,6 +7,7 @@ from loguru import logger
 
 from src.app.config import Config
 from src.app.core import router as core_router
+from src.app.errors import register_exception_handlers
 from src.app.lifespan import lifespan
 from src.app.logging import setup_logger
 from src.app.meta import tags_metadata
@@ -40,6 +41,7 @@ def get_application(config: Dict) -> FastAPI:
 
     application.middleware("http")(request_timer)
     application.middleware("http")(add_request_id)
+    register_exception_handlers(application)
 
     application.include_router(core_router.core, tags=["core"])
 
