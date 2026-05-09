@@ -7,6 +7,7 @@ from loguru import logger
 
 from src.app.config import Config
 from src.app.core import router as core_router
+from src.app.lifespan import lifespan
 from src.app.logging import setup_logger
 from src.app.meta import tags_metadata
 from src.app.middleware import RequestTimer, add_request_id
@@ -32,9 +33,10 @@ def get_application(config: Dict) -> FastAPI:
     -------
     """
     request_timer = RequestTimer()
-    application = FastAPI(openapi_tags=tags_metadata)
+    application = FastAPI(lifespan=lifespan, openapi_tags=tags_metadata)
 
-    application.state = config
+    for key in config.model_fields:
+        setattr(application.state, key, getattr(config, key))
 
     application.middleware("http")(request_timer)
     application.middleware("http")(add_request_id)
