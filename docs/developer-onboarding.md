@@ -73,6 +73,11 @@ port `5000` by default.
 See `docs/configuration.md` for how `FASTAPI_ENV`, `config.toml`, `.env`, and
 Compose fit together, and where each kind of setting belongs.
 
+`PORT` and `WEB_CONCURRENCY` are process runtime settings consumed by
+`src/app/runtime.py` when the container entrypoint starts uvicorn. Both must be
+positive integers. Invalid values print a runtime configuration error to stderr
+and exit with status `2`.
+
 ## Docker Compose
 
 Run the service with Compose:
@@ -88,7 +93,10 @@ make down
 ```
 
 Compose reads `.env` automatically when present. `PORT` changes the host port;
-the container still listens on port `5000`.
+the container still listens on port `5000`. `WEB_CONCURRENCY` is passed through
+to the container and controls uvicorn worker count. The Dockerfile defaults are
+`FASTAPI_ENV=PROD`, `PORT=5000`, and `WEB_CONCURRENCY=2`; Compose overrides
+`FASTAPI_ENV` to `${FASTAPI_ENV:-DEV}` for local development.
 
 ## PR/update checklist
 
@@ -376,7 +384,10 @@ method, path, status, duration_ms, request_id, trace_id, span_id
 ```
 
 The JSON sink lives in `src/app/logging.py:39`. `trace_id` and `span_id` are
-populated from the active OTel span when tracing is enabled. On unhandled
+populated only when the current request has an active, valid OTel span. Those
+fields are absent when tracing is disabled or no span is active. The log
+fields come from `RequestTimer` and the request id ContextVar, then
+`sink_serializer` merges `record["extra"]` into the emitted JSON. On unhandled
 exceptions the timer logs `status=500` and re-raises so the registered
 exception handlers still run.
 
@@ -434,12 +445,28 @@ are mounted and toggles two independent features from the config block:
 - **Prometheus** — registers a private `CollectorRegistry` with
   `http_requests_total` (Counter) and `http_request_duration_seconds`
   (Histogram), both labelled `(method, path, status)` where `path` is the
-  matched route template to bound cardinality. Exposes the registry at the
-  configured `metrics` path (default `/metrics`), excluded from OpenAPI.
+  matched route template to bound cardinality. Unknown routes fall back to the
+  raw request path. The metrics endpoint itself is skipped by the middleware so
+  scrapes do not count as app traffic. Exposes the registry at the configured
+  `metrics` path (default `/metrics`), excluded from OpenAPI.
 - **OTel tracing** — installs a `TracerProvider` with `service.name` from
-  config (only if one isn't already set) and calls
+  config only when the global provider is still OpenTelemetry's proxy provider,
+  then calls
   `FastAPIInstrumentor().instrument_app(app)`, producing one span per
   request. The request log automatically picks up `trace_id`/`span_id`.
+
+Prometheus and tracing are both disabled by default. Enable them per deployment
+block in `config.toml`:
+
+```toml
+[DEV.observability.prometheus]
+enabled = true
+path = "/metrics"
+
+[DEV.observability.tracing]
+enabled = true
+service_name = "fastapi_skeleton"
+```
 
 ### Routing
 
