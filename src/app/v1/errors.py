@@ -8,7 +8,7 @@ class APIException(Exception):
 
 
 # @v1.exception_handler(APIException)
-def bad_request(request: Request, exc: APIException):
+def api_exception_handler(request: Request, exc: APIException):
     # logger.error(error.to_dict())
     return JSONResponse(
         status_code=418,

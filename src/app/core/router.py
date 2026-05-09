@@ -11,19 +11,19 @@ core = APIRouter()
 
 
 @core.get("/health", response_model=HealthCheckResponse)
-def health(request: Request) -> HealthCheckResponse:
+def health_get(request: Request) -> HealthCheckResponse:
     logger.debug(f"Methode: {request.method} on {request.url.path}")
     return {"version": request.app.state.VERSION, "timestamp": time()}
 
 
 @core.post("/health", response_model=HealthCheckResponse)
-def health(request: Request) -> HealthCheckResponse:
+def health_post(request: Request) -> HealthCheckResponse:
     logger.debug(f"Methode: {request.method} on {request.url.path}")
     return {"version": request.app.state.VERSION, "timestamp": time()}
 
 
 @core.websocket("/ws/health")
-async def health(websocket: WebSocket) -> None:
+async def health_ws(websocket: WebSocket) -> None:
     await websocket.accept()
     try:
         while True:
