@@ -3,6 +3,25 @@
 This project is a small FastAPI skeleton for stateless services. The default
 local app port is `5000`.
 
+## Project map
+
+| Concern | File | Purpose |
+| --- | --- | --- |
+| Entry point | `src/app/main.py` | Builds the `FastAPI` app, wires lifespan, middleware, errors, routers |
+| Lifespan | `src/app/lifespan.py` | Startup/shutdown; attaches resources, closers, readiness checks to `app.state` |
+| Config | `src/app/config.py` | Loads deployment block from `config.toml` via `FASTAPI_ENV` |
+| Routers | `src/app/core/router.py`, `src/app/v1/router.py` | Unversioned health/ws routes; versioned `v1` routes |
+| Schemas | `src/app/core/schema.py`, `src/app/v1/schema.py` | Pydantic request/response models per router |
+| Dependencies | `src/app/dependencies.py` | FastAPI `Depends` factories for shared resources |
+| Errors | `src/app/errors.py` | Exception handlers and error response shape |
+| Middleware | `src/app/middleware.py` | Request/response middleware (request id, request timing) |
+| Logging | `src/app/logging.py` | Logger configuration and sinks |
+| Observability | `src/app/observability.py` | Metrics/tracing setup |
+| Runtime | `src/app/runtime.py` | Process-level runtime helpers |
+| Context | `src/app/context.py` | Request-scoped context helpers |
+| Meta | `src/app/meta.py` | App metadata (OpenAPI tags) |
+| Tests | `tests/test_*.py` | One file per concern: `test_main`, `test_config`, `test_errors`, `test_cors`, `test_dependencies`, `test_health`, `test_lifespan`, `test_logging_sink`, `test_observability`, `test_request_log`, `test_runtime`, `test_websocket_logging` |
+
 ## First local run
 
 Walk through these steps in order on a fresh clone. The service listens on
