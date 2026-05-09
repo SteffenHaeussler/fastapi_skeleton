@@ -7,100 +7,71 @@ local app port is `5000`.
 
 | Concern | File | Purpose |
 | --- | --- | --- |
-| Entry point | `src/app/main.py` | Builds the `FastAPI` app, wires lifespan, middleware, errors, routers |
-| Lifespan | `src/app/lifespan.py` | Startup/shutdown; attaches resources, closers, readiness checks to `app.state` |
-| Config | `src/app/config.py` | Loads deployment block from `config.toml` via `FASTAPI_ENV` |
-| Routers | `src/app/core/router.py`, `src/app/v1/router.py` | Unversioned health/ws routes; versioned `v1` routes |
-| Schemas | `src/app/core/schema.py`, `src/app/v1/schema.py` | Pydantic request/response models per router |
+| Entry point | `src/app/main.py` | Builds the app, wires lifespan, middleware, errors, routers |
+| Lifespan | `src/app/lifespan.py` | Startup/shutdown resources, closers, readiness checks |
+| Config | `src/app/config.py` | Loads `config.toml` deployment block selected by `FASTAPI_ENV` |
+| Routers | `src/app/core/router.py`, `src/app/v1/router.py` | Core health/ws routes and versioned API routes |
+| Schemas | `src/app/core/schema.py`, `src/app/v1/schema.py` | Pydantic request/response models |
 | Dependencies | `src/app/dependencies.py` | FastAPI `Depends` factories for shared resources |
-| Errors | `src/app/errors.py` | Exception handlers and error response shape |
-| Middleware | `src/app/middleware.py` | Request/response middleware (request id, request timing) |
-| Logging | `src/app/logging.py` | Logger configuration and sinks |
-| Observability | `src/app/observability.py` | Metrics/tracing setup |
+| Errors | `src/app/errors.py` | Exception handlers and error response envelope |
+| Middleware | `src/app/middleware.py` | Request ID and request timing middleware |
+| Logging | `src/app/logging.py` | Logger configuration and JSON sink |
+| Observability | `src/app/observability.py` | Prometheus and OpenTelemetry setup |
 | Runtime | `src/app/runtime.py` | Process-level runtime helpers |
 | Context | `src/app/context.py` | Request-scoped context helpers |
-| Meta | `src/app/meta.py` | App metadata (OpenAPI tags) |
-| Tests | `tests/test_*.py` | One file per concern: `test_main`, `test_config`, `test_errors`, `test_cors`, `test_dependencies`, `test_health`, `test_lifespan`, `test_logging_sink`, `test_observability`, `test_request_log`, `test_runtime`, `test_websocket_logging` |
+| Meta | `src/app/meta.py` | OpenAPI tag metadata |
+| Tests | `tests/test_*.py` | Focused tests by concern |
 
 ## First local run
 
-Walk through these steps in order on a fresh clone. The service listens on
-port `5000` by default.
+Run these from a fresh clone:
 
-1. **Install dependencies**
+```bash
+uv sync
+make run
+```
 
-   ```bash
-   uv sync
-   ```
+In another terminal:
 
-2. **Start the service**
+```bash
+curl -X GET "http://localhost:5000/health" -H "accept: application/json"
+curl -X GET "http://localhost:5000/v1/health" -H "accept: application/json"
+make test
+make lint
+```
 
-   ```bash
-   make run
-   ```
-
-   Leave this running in one terminal. Uvicorn logs the bound address on
-   startup.
-
-3. **Hit the health endpoints** (in a second terminal)
-
-   ```bash
-   curl -X GET "http://localhost:5000/health" -H "accept: application/json"
-   curl -X GET "http://localhost:5000/v1/health" -H "accept: application/json"
-   ```
-
-   Both should return `200` with a JSON body. Stop the server with Ctrl-C
-   when you're done.
-
-4. **Run the tests**
-
-   ```bash
-   make test
-   ```
-
-   Runs pytest with coverage.
-
-5. **Lint**
-
-   ```bash
-   make lint
-   ```
-
-   Runs `ruff check`. Use `make format` to auto-fix style issues.
+Both health calls should return `200` JSON responses. Stop the server with
+Ctrl-C. `make lint` runs `ruff check`; `make format` auto-fixes style issues.
 
 ## Local configuration
 
 See `docs/configuration.md` for how `FASTAPI_ENV`, `config.toml`, `.env`, and
-Compose fit together, and where each kind of setting belongs.
+Compose fit together.
 
-`PORT` and `WEB_CONCURRENCY` are process runtime settings consumed by
-`src/app/runtime.py` when the container entrypoint starts uvicorn. Both must be
-positive integers. Invalid values print a runtime configuration error to stderr
-and exit with status `2`.
+Quick facts:
+
+- `FASTAPI_ENV` values normalize to `DEV`, `STAGE`, `PROD`, or `TEST`.
+- `PORT` and `WEB_CONCURRENCY` are runtime settings consumed by
+  `src/app/runtime.py`.
+- `PORT` and `WEB_CONCURRENCY` must be positive integers; invalid values print
+  a runtime configuration error to stderr and exit with status `2`.
 
 ## Docker Compose
 
-Run the service with Compose:
-
 ```bash
 make up
-```
-
-Stop the Compose services:
-
-```bash
 make down
 ```
 
-Compose reads `.env` automatically when present. `PORT` changes the host port;
-the container still listens on port `5000`. `WEB_CONCURRENCY` is passed through
-to the container and controls uvicorn worker count. The Dockerfile defaults are
-`FASTAPI_ENV=PROD`, `PORT=5000`, and `WEB_CONCURRENCY=2`; Compose overrides
-`FASTAPI_ENV` to `${FASTAPI_ENV:-DEV}` for local development.
+Compose reads `.env` automatically. `PORT` changes the host port; the container
+still listens on `5000`. `WEB_CONCURRENCY` is passed through to the container
+and controls uvicorn worker count. Dockerfile defaults are `FASTAPI_ENV=PROD`,
+`PORT=5000`, and `WEB_CONCURRENCY=2`; Compose defaults `FASTAPI_ENV` to `DEV`
+for local development.
 
 ## PR/update checklist
 
-Before opening or updating a PR, run the same checks that CI runs:
+Run the same checks CI runs:
 
 ```bash
 uv sync --locked --dev
@@ -110,8 +81,7 @@ uv run pytest --verbose --cov=./
 uv build
 ```
 
-For changes that touch Docker, runtime configuration, health checks, or startup
-behavior, also smoke-test the service locally:
+For Docker, runtime configuration, health check, or startup changes, also run:
 
 ```bash
 make docker-build
@@ -121,50 +91,47 @@ curl -X GET "http://localhost:5000/health/ready" -H "accept: application/json"
 make down
 ```
 
-`make test` and `make lint` are useful shortcuts, but CI uses the exact
-commands above from `.github/workflows/ci.yml`; the Makefile shortcuts do not
-cover the package build or ruff format check.
+`make test` and `make lint` are useful shortcuts, but CI also checks package
+builds and ruff formatting.
 
 ### Dependency updates
 
-Use `uv` as the source of truth for dependency changes:
+Use `uv` as the source of truth:
 
 ```bash
-uv add <package>                 # runtime dependency
-uv add --dev <package>           # development-only dependency
-uv lock --upgrade-package <name> # targeted upgrade
-uv lock --upgrade                # broad upgrade, only when intentional
+uv add <package>
+uv add --dev <package>
+uv lock --upgrade-package <name>
+uv lock --upgrade
 uv lock --check
 uv sync --locked --dev
 ```
 
-Commit `pyproject.toml` and `uv.lock` together whenever dependencies change.
-Do not hand-edit `uv.lock` or use `pip install` as the dependency source of
-truth.
+Commit `pyproject.toml` and `uv.lock` together. Do not hand-edit `uv.lock` or
+use `pip install` as the dependency source of truth.
 
 ### Common gotchas
 
-- `make format` rewrites files. Use `uv run ruff format --check .` when
-  verifying a PR without changing the worktree.
-- The Docker runtime image installs production dependencies only. Packages
-  needed for tests, linting, or local tooling belong in the dev dependency
-  group.
-- `FASTAPI_ENV` must resolve to one of `DEV`, `STAGE`, `PROD`, or `TEST`.
-  Docker Compose defaults to `DEV` when `.env` does not override it.
+- `make format` rewrites files; use `uv run ruff format --check .` for a
+  read-only PR check.
+- Runtime images install production dependencies only. Test, lint, and tooling
+  packages belong in the dev dependency group.
+- `FASTAPI_ENV` is stored uppercase in the supported config blocks.
 
 ## Add a new endpoint
 
-Use the API version that owns the route. For most new application endpoints,
-that means adding schemas in `src/app/v1/schema.py`, adding the route in
-`src/app/v1/router.py`, and testing the public `/v1/...` path.
+Most application endpoints belong under `/v1`:
 
-### 1. Add request and response schemas
+1. Add request/response models in `src/app/v1/schema.py`.
+2. Import them in `src/app/v1/router.py`.
+3. Add the route to the shared `v1` router with an explicit `response_model`.
+4. Add focused `TestClient` tests for success, validation, and public response
+   shape.
 
-Define the request and response models near the API version that owns the
-route. Keep response models explicit so callers, tests, and OpenAPI all agree
-on the shape of the endpoint.
+Minimal pattern:
 
 ```python
+# src/app/v1/schema.py
 from pydantic import BaseModel
 
 
@@ -176,36 +143,15 @@ class EchoResponse(BaseModel):
     message: str
 ```
 
-### 2. Import the schemas in the router
-
-Import the new models in `src/app/v1/router.py` alongside the existing versioned
-schemas.
-
 ```python
-from src.app.v1.schema import EchoRequest, EchoResponse, HealthCheckResponse
-```
-
-### 3. Add the route with a `response_model`
-
-Add the route to the shared `v1` router. Always set `response_model` so FastAPI
-validates the returned data and includes the response shape in OpenAPI.
-
-```python
+# src/app/v1/router.py
 @v1.post("/echo", response_model=EchoResponse)
 def echo(payload: EchoRequest) -> EchoResponse:
     return EchoResponse(message=payload.message)
 ```
 
-Returning an `EchoResponse` instance is the clearest option. Returning a
-compatible `dict` also works, but `response_model` still controls the public
-response body.
-
-### 4. Add focused `TestClient` tests
-
-Put endpoint tests in a focused test module, for example `tests/test_echo.py`.
-Test the success path, request validation, and the public response shape.
-
 ```python
+# tests/test_echo.py
 from fastapi.testclient import TestClient
 
 from src.app.main import app
@@ -224,23 +170,11 @@ def test_echo_rejects_invalid_payload():
         response = client.post("/v1/echo", json={})
 
     assert response.status_code == 422
-
-
-def test_echo_response_shape_contains_only_response_fields():
-    with TestClient(app) as client:
-        response = client.post(
-            "/v1/echo",
-            json={"message": "hello", "ignored": "not in schema"},
-        )
-
-    assert response.status_code == 200
-    assert response.json() == {"message": "hello"}
 ```
 
 ## Handle errors
 
-All HTTP error responses are wrapped by the handlers in `src/app/errors.py`.
-The shared envelope has this shape:
+All HTTP error responses are wrapped by handlers in `src/app/errors.py`:
 
 ```json
 {
@@ -252,292 +186,53 @@ The shared envelope has this shape:
 }
 ```
 
-Use FastAPI `HTTPException` for direct HTTP protocol failures inside route
-handlers, such as bad input, forbidden access, or a missing resource when no
-domain-specific exception exists.
-
-```python
-from fastapi import HTTPException
-
-
-@v1.get("/items/{item_id}", response_model=ItemResponse)
-async def get_item(item_id: str, client: SomeClientDep) -> ItemResponse:
-    item = await client.get(item_id)
-    if item is None:
-        raise HTTPException(status_code=404, detail="item not found")
-    return ItemResponse.model_validate(item)
-```
-
-Use `APIException` subclasses for app or domain errors that should keep a
-stable status code, error code, optional details, and client-safe message.
-
-```python
-from src.app.errors import APIException
-
-
-class ItemUnavailable(APIException):
-    status_code = 409
-    error_code = "item_unavailable"
-
-
-@v1.post("/items/{item_id}/reserve", response_model=ItemResponse)
-async def reserve_item(item_id: str, client: SomeClientDep) -> ItemResponse:
-    item = await client.reserve(item_id)
-    if item is None:
-        raise ItemUnavailable(
-            "item cannot be reserved",
-            details={"item_id": item_id},
-        )
-    return ItemResponse.model_validate(item)
-```
-
-Do not rely on raw exception messages as user-facing output. Unexpected
-exceptions are logged with the request ID and returned as a sanitized 500:
-
-```json
-{
-  "error": "internal_server_error",
-  "message": "Internal server error",
-  "status": 500,
-  "request_id": "request-id",
-  "details": null
-}
-```
+Use FastAPI `HTTPException` for direct HTTP protocol failures. Use
+`APIException` subclasses for app/domain errors that need a stable status code,
+error code, optional details, and client-safe message. Unexpected exceptions
+are logged with the request ID and returned as sanitized
+`internal_server_error` responses.
 
 ## Add a shared resource
 
-Use the lifespan state for clients that need startup or shutdown, such as
-database pools, HTTP clients, or model clients.
+Use lifespan state for clients that need startup/shutdown, such as database
+pools, HTTP clients, or model clients:
 
 1. Create and attach the client in `src/app/lifespan.py` before `yield`.
 2. Store it on `app.state.resources.<name>`.
 3. Append async cleanup callables to `app.state._closers`.
 4. Append readiness checks to `app.state.readiness_checks`.
-5. Expose the resource through `src/app/dependencies.py`.
-6. In tests, override the dependency factory with `app.dependency_overrides`.
+5. Expose the resource through a dependency in `src/app/dependencies.py`.
+6. In tests, override the dependency with `app.dependency_overrides`.
 
-Pseudo-DB example:
-
-Use this as a copyable starting point for a real database pool/session/client.
-`DatabaseClient` is pseudo-code; replace it with the concrete type and methods
-from the database library used by your service.
-
-Configuration:
-
-```toml
-[DEV]
-CONFIG_NAME = "dev"
-DEBUG = false
-# database_url = "postgresql://app:secret@localhost:5432/app"
-```
-
-When turning this into real code, add the matching field to the config model
-before reading `app.state.api_mode.database_url`.
-
-Lifespan setup:
-
-```python
-from contextlib import asynccontextmanager
-from types import SimpleNamespace
-
-from fastapi import FastAPI
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    app.state.resources = SimpleNamespace()
-    app.state.readiness_checks = []
-    app.state._closers = []
-
-    db = DatabaseClient(app.state.api_mode.database_url)
-    await db.connect()
-
-    app.state.resources.db = db
-    app.state._closers.append(db.aclose)
-    app.state.readiness_checks.append(("db", db.ping))
-
-    try:
-        yield
-    finally:
-        for closer in reversed(app.state._closers):
-            await closer()
-```
-
-Dependency factory:
-
-```python
-from typing import Annotated
-
-from fastapi import Depends, Request
-
-
-def get_db(request: Request) -> DatabaseClient:
-    return request.app.state.resources.db
-
-
-DBDep = Annotated[DatabaseClient, Depends(get_db)]
-```
-
-Router usage:
-
-```python
-@v1.get("/items/{item_id}", response_model=ItemResponse)
-async def get_item(item_id: str, db: DBDep) -> ItemResponse:
-    item = await db.fetch_item(item_id)
-    return ItemResponse.model_validate(item)
-```
-
-Test override:
-
-```python
-from fastapi.testclient import TestClient
-
-from src.app.dependencies import get_db
-from src.app.main import app
-
-
-def test_get_item_uses_db_override():
-    fake_db = FakeDatabaseClient(items={"abc": {"id": "abc", "name": "Example"}})
-    app.dependency_overrides[get_db] = lambda: fake_db
-
-    try:
-        with TestClient(app) as client:
-            response = client.get("/v1/items/abc")
-    finally:
-        app.dependency_overrides.pop(get_db, None)
-
-    assert response.status_code == 200
-    assert response.json() == {"id": "abc", "name": "Example"}
-```
+If the resource needs configuration, add the setting in `src/app/config.py` and
+`config.toml` before reading it from `app.state.api_mode`.
 
 ## Request lifecycle
 
-Every HTTP request flows through a fixed chain of middleware before it reaches
-a route, and through the same chain in reverse on the way out. Starlette runs
-the **last-added middleware first**, so the effective wrap order set up in
-`src/app/main.py:46-58` is:
+Middleware order is defined in `src/app/main.py`. Starlette runs the last-added
+middleware first, so HTTP requests flow through:
 
-```
-client → add_request_id → RequestTimer → prometheus_middleware → CORSMiddleware → route
+```text
+client -> add_request_id -> RequestTimer -> prometheus_middleware -> CORSMiddleware -> route
 ```
 
-### Request ID
+Important behavior:
 
-`add_request_id` (`src/app/middleware.py:52`) reads the incoming
-`x-request-id` header or generates a fresh `uuid4().hex`. It stores the id on
-`request.state.request_id` and in the `ctx_request_id` ContextVar
-(`src/app/context.py`) so any code — including the log sink — can read it
-without threading the request through. The same id is echoed back as
-`X-Request-ID` on every response, including error responses.
-
-### Timing and request log
-
-`RequestTimer` (`src/app/middleware.py:21`) measures wall time around
-`call_next`, sets an `X-Process-Time` header (in seconds), and emits one
-structured JSON log line per request:
-
-```
-method, path, status, duration_ms, request_id, trace_id, span_id
-```
-
-The JSON sink lives in `src/app/logging.py:39`. `trace_id` and `span_id` are
-populated only when the current request has an active, valid OTel span. Those
-fields are absent when tracing is disabled or no span is active. The log
-fields come from `RequestTimer` and the request id ContextVar, then
-`sink_serializer` merges `record["extra"]` into the emitted JSON. On unhandled
-exceptions the timer logs `status=500` and re-raises so the registered
-exception handlers still run.
-
-### Error envelope
-
-All errors return the same JSON shape (`ErrorResponse` in
-`src/app/errors.py:12`):
-
-```json
-{
-  "error": "validation_error",
-  "message": "Request validation failed",
-  "status": 422,
-  "request_id": "…",
-  "details": { "errors": [...] }
-}
-```
-
-Four handlers are registered in `register_exception_handlers`:
-
-- `HTTPException` — `error` is the snake-cased status phrase.
-- `RequestValidationError` — `error="validation_error"`, status 422,
-  `details.errors` from pydantic.
-- `APIException` — the project's base class for app-specific errors. Subclass
-  it to add domain errors:
-
-  ```python
-  from src.app.errors import APIException
-
-
-  class ItemNotFound(APIException):
-      status_code = 404
-      error_code = "item_not_found"
-  ```
-
-- Bare `Exception` — logs the traceback and returns a generic 500 with no
-  internal detail.
-
-`_envelope` always sets `X-Request-ID` and re-applies CORS headers, because
-FastAPI exception responses bypass `CORSMiddleware`.
-
-### CORS
-
-CORS is driven by `config.api_mode.cors` in `config.toml`. The middleware is
-only added when `cors.enabled` is true (`src/app/main.py:46-54`); origins,
-methods, headers, and credentials all come from config. Error responses
-re-emit the matching headers manually so cross-origin clients still see the
-JSON envelope.
-
-### Observability hooks
-
-`configure_observability` (`src/app/observability.py`) is called before routes
-are mounted and toggles two independent features from the config block:
-
-- **Prometheus** — registers a private `CollectorRegistry` with
-  `http_requests_total` (Counter) and `http_request_duration_seconds`
-  (Histogram), both labelled `(method, path, status)` where `path` is the
-  matched route template to bound cardinality. Unknown routes fall back to the
-  raw request path. The metrics endpoint itself is skipped by the middleware so
-  scrapes do not count as app traffic. Exposes the registry at the configured
-  `metrics` path (default `/metrics`), excluded from OpenAPI.
-- **OTel tracing** — installs a `TracerProvider` with `service.name` from
-  config only when the global provider is still OpenTelemetry's proxy provider,
-  then calls
-  `FastAPIInstrumentor().instrument_app(app)`, producing one span per
-  request. The request log automatically picks up `trace_id`/`span_id`.
-
-Prometheus and tracing are both disabled by default. Enable them per deployment
-block in `config.toml`:
-
-```toml
-[DEV.observability.prometheus]
-enabled = true
-path = "/metrics"
-
-[DEV.observability.tracing]
-enabled = true
-service_name = "fastapi_skeleton"
-```
-
-### Routing
-
-`src/app/main.py:60-62` mounts:
-
-- `core_router.core` at the root with tag `core` —
-  `/health`, `/health/live`, `/health/ready`, `/ws/health`.
-- `v1_router.v1` at `/v1` with tag `v1` — versioned health surface; this is
-  where new versioned endpoints belong.
-
-Tag metadata for the docs comes from `src/app/meta.py` via `openapi_tags`.
-
-`/health/ready` (`src/app/core/router.py`) runs every check appended to
-`app.state.readiness_checks` concurrently with `asyncio.gather` and returns
-503 if any return false or raise. Websocket endpoints accept the connection,
-push a `HealthCheckResponse` every 10 seconds, and log
-`event="websocket.disconnect"` with the close code on disconnect.
+- Request ID: `add_request_id` reads `x-request-id` or generates one, stores it
+  on `request.state.request_id`, sets the context var, and returns
+  `X-Request-ID` on every response.
+- Timing/logging: `RequestTimer` sets `X-Process-Time` and emits one JSON
+  request log with method, path, status, duration, request ID, and trace/span
+  IDs when tracing is active.
+- Error envelope: registered handlers cover `HTTPException`,
+  `RequestValidationError`, `APIException`, and bare `Exception`. Error
+  responses also re-apply `X-Request-ID` and CORS headers.
+- CORS: enabled only when `config.api_mode.cors.enabled` is true; origins,
+  methods, headers, and credentials come from `config.toml`.
+- Observability: Prometheus and tracing are disabled by default and enabled per
+  deployment block in `config.toml`. Prometheus exposes the configured metrics
+  path; tracing sets the OpenTelemetry service name from config.
+- Routing: core routes live at `/health`, `/health/live`, `/health/ready`, and
+  `/ws/health`; versioned routes include `/v1/health` and `/v1/ws/health`.
+- Readiness: `/health/ready` runs all `app.state.readiness_checks`
+  concurrently and returns `503` if any check fails or raises.
