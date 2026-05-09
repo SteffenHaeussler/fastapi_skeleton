@@ -43,20 +43,36 @@ def _status_phrase(status: int) -> str:
 
 
 def _envelope(
+    request: Request,
     *,
     error: str,
     message: str,
     status: int,
     details: dict | None = None,
 ) -> JSONResponse:
+    request_id = ctx_request_id.get()
     payload = ErrorResponse(
         error=error,
         message=message,
         status=status,
-        request_id=ctx_request_id.get(),
+        request_id=request_id,
         details=details,
     )
-    return JSONResponse(status_code=status, content=payload.model_dump())
+    response = JSONResponse(status_code=status, content=payload.model_dump())
+    response.headers["X-Request-ID"] = request_id
+
+    origin = request.headers.get("origin")
+    cors = getattr(getattr(request.app.state, "api_mode", None), "cors", None)
+    if origin and cors is not None and cors.enabled:
+        if "*" in cors.allow_origins:
+            response.headers["Access-Control-Allow-Origin"] = "*"
+        elif origin in cors.allow_origins:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers.add_vary_header("Origin")
+        if cors.allow_credentials:
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+
+    return response
 
 
 async def http_exception_handler(
@@ -74,6 +90,7 @@ async def http_exception_handler(
         details = None
 
     return _envelope(
+        request,
         error=_phrase_to_code(exc.status_code),
         message=message,
         status=exc.status_code,
@@ -86,6 +103,7 @@ async def validation_exception_handler(
     exc: RequestValidationError,
 ) -> JSONResponse:
     return _envelope(
+        request,
         error="validation_error",
         message="Request validation failed",
         status=422,
@@ -95,6 +113,7 @@ async def validation_exception_handler(
 
 async def api_exception_handler(request: Request, exc: APIException) -> JSONResponse:
     return _envelope(
+        request,
         error=exc.error_code,
         message=exc.message,
         status=exc.status_code,
@@ -105,6 +124,7 @@ async def api_exception_handler(request: Request, exc: APIException) -> JSONResp
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.exception("unhandled exception")
     return _envelope(
+        request,
         error="internal_server_error",
         message="Internal server error",
         status=500,

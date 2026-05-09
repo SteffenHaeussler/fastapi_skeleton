@@ -129,3 +129,11 @@ def test_bare_exception_does_not_leak_message():
     assert body["error"] == "internal_server_error"
     assert body["message"] == "Internal server error"
     assert "secret leak" not in body["message"]
+
+
+def test_bare_exception_echoes_request_id_header():
+    client = _make_app()
+    r = client.get("/raise-bare", headers={"X-Request-ID": "rid"})
+    assert r.status_code == 500
+    assert r.json()["request_id"] == "rid"
+    assert r.headers["X-Request-ID"] == "rid"

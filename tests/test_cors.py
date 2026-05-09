@@ -45,3 +45,22 @@ def test_cors_enabled_emits_preflight_headers():
     )
     assert r.headers.get("access-control-allow-origin") == "https://example.com"
     assert "GET" in r.headers.get("access-control-allow-methods", "")
+
+
+def test_cors_enabled_applies_to_unhandled_500_envelope():
+    config = _base_config()
+    config.api_mode.cors.enabled = True
+    config.api_mode.cors.allow_origins = ["https://example.com"]
+
+    app = get_application(config)
+
+    @app.get("/raise-bare")
+    def _raise_bare():
+        raise RuntimeError("internal secret leak attempt")
+
+    client = TestClient(app, raise_server_exceptions=False)
+    r = client.get("/raise-bare", headers={"Origin": "https://example.com"})
+
+    assert r.status_code == 500
+    assert r.headers.get("access-control-allow-origin") == "https://example.com"
+    assert r.json()["error"] == "internal_server_error"

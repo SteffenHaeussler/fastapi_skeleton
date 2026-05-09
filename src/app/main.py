@@ -39,6 +39,7 @@ def get_application(config: Dict) -> FastAPI:
 
     for key in config.model_fields:
         setattr(application.state, key, getattr(config, key))
+    application.state.api_mode = config.api_mode
 
     cors = config.api_mode.cors
     if cors.enabled:
