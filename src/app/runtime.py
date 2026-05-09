@@ -26,7 +26,9 @@ def _positive_int(env: Mapping[str, str], name: str, default: int) -> int:
         ) from exc
 
     if value < 1:
-        raise RuntimeConfigError(f"{name} must be a positive integer, got {raw_value!r}")
+        raise RuntimeConfigError(
+            f"{name} must be a positive integer, got {raw_value!r}"
+        )
 
     return value
 

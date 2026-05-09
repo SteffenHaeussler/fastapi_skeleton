@@ -29,9 +29,7 @@ def test_runtime_config_reads_custom_values(monkeypatch):
         ("WEB_CONCURRENCY", "-1"),
     ],
 )
-def test_runtime_config_rejects_invalid_positive_ints(
-    monkeypatch, env_name, env_value
-):
+def test_runtime_config_rejects_invalid_positive_ints(monkeypatch, env_name, env_value):
     monkeypatch.setenv(env_name, env_value)
 
     with pytest.raises(
