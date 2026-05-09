@@ -65,13 +65,22 @@ FROM python:3.12-slim AS runtime
 
 ENV LC_ALL=C.UTF-8 \
     LANG=C.UTF-8 \
-    PATH="/app/.venv/bin:$PATH"
+    PATH="/app/.venv/bin:$PATH" \
+    FASTAPI_ENV=PROD \
+    PORT=5000 \
+    WEB_CONCURRENCY=2
 
 WORKDIR /app
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
-COPY --from=build-prod /app /app
+RUN groupadd --gid 10001 app \
+    && useradd --uid 10001 --gid app --home-dir /app --no-create-home app
+
+COPY --from=build-prod --chown=app:app /app /app
+
+USER app:app
 
 EXPOSE 5000
 
-ENTRYPOINT ["bash", "./run_app.sh"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD ["python", "-c", "import os, urllib.request; port = os.environ.get('PORT', '5000'); urllib.request.urlopen(f'http://127.0.0.1:{port}/health/live', timeout=2).read()"]
+
+ENTRYPOINT ["python", "-m", "src.app.runtime"]
