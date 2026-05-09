@@ -42,7 +42,7 @@ def sink_serializer(message):
         "level": record["level"].name,
         "message": record["message"],
         "timestamp": record["time"].timestamp(),
-        "request_id": record["request_id"],
+        "request_id": record["extra"].get("request_id", record["request_id"]),
     }
     for key, value in record["extra"].items():
         if key not in simplified:

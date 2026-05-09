@@ -50,7 +50,7 @@ def _envelope(
     status: int,
     details: dict | None = None,
 ) -> JSONResponse:
-    request_id = ctx_request_id.get()
+    request_id = _request_id(request)
     payload = ErrorResponse(
         error=error,
         message=message,
@@ -73,6 +73,13 @@ def _envelope(
             response.headers["Access-Control-Allow-Credentials"] = "true"
 
     return response
+
+
+def _request_id(request: Request) -> str:
+    context_request_id = ctx_request_id.get()
+    if context_request_id != "-":
+        return context_request_id
+    return getattr(request.state, "request_id", context_request_id)
 
 
 async def http_exception_handler(
@@ -122,7 +129,7 @@ async def api_exception_handler(request: Request, exc: APIException) -> JSONResp
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("unhandled exception")
+    logger.bind(request_id=_request_id(request)).exception("unhandled exception")
     return _envelope(
         request,
         error="internal_server_error",

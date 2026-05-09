@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.app.config import CORSConfig, Config, Deployment
+from src.app.config import CORSConfig, Config, Deployment, ObservabilityConfig
 
 
 def test_cors_config_defaults_disabled():
@@ -17,6 +17,22 @@ def test_deployment_has_default_cors_config():
     config = Config()
     assert config.DEV.cors.enabled is False
     assert config.PROD.cors.enabled is False
+
+
+def test_observability_config_defaults_disabled():
+    observability = ObservabilityConfig()
+
+    assert observability.prometheus.enabled is False
+    assert observability.prometheus.path == "/metrics"
+    assert observability.tracing.enabled is False
+    assert observability.tracing.service_name == "fastapi_skeleton"
+
+
+def test_deployment_has_default_observability_config():
+    config = Config()
+
+    assert config.DEV.observability.prometheus.enabled is False
+    assert config.DEV.observability.tracing.enabled is False
 
 
 def test_api_mode_returns_selected_deployment(monkeypatch):

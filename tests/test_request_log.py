@@ -6,7 +6,9 @@ from contextlib import redirect_stdout
 from fastapi.testclient import TestClient
 
 from src.app.logging import setup_logger
+from src.app.context import ctx_request_id
 from src.app.main import app
+from src.app.middleware import add_request_id
 
 
 def test_request_id_echoed_when_provided():
@@ -58,3 +60,68 @@ def test_x_process_time_header_still_present():
     with TestClient(app) as client:
         r = client.get("/health")
     assert "X-Process-Time" in r.headers
+
+
+def test_request_id_context_is_restored_after_request():
+    async def call_next(_request):
+        from fastapi import Response
+
+        assert ctx_request_id.get() == "scoped-id"
+        return Response()
+
+    async def run_request():
+        from types import SimpleNamespace
+
+        token = ctx_request_id.set("outer-id")
+        try:
+            request = type(
+                "Request",
+                (),
+                {
+                    "headers": {"x-request-id": "scoped-id"},
+                    "state": SimpleNamespace(),
+                },
+            )()
+
+            response = await add_request_id(request, call_next)
+
+            assert response.headers["X-Request-ID"] == "scoped-id"
+            assert ctx_request_id.get() == "outer-id"
+        finally:
+            ctx_request_id.reset(token)
+
+    import anyio
+
+    anyio.run(run_request)
+
+
+def test_request_id_context_is_restored_when_downstream_raises():
+    async def call_next(_request):
+        assert ctx_request_id.get() == "failing-id"
+        raise RuntimeError("boom")
+
+    async def run_request():
+        import pytest
+        from types import SimpleNamespace
+
+        token = ctx_request_id.set("outer-id")
+        try:
+            request = type(
+                "Request",
+                (),
+                {
+                    "headers": {"x-request-id": "failing-id"},
+                    "state": SimpleNamespace(),
+                },
+            )()
+
+            with pytest.raises(RuntimeError, match="boom"):
+                await add_request_id(request, call_next)
+
+            assert ctx_request_id.get() == "outer-id"
+        finally:
+            ctx_request_id.reset(token)
+
+    import anyio
+
+    anyio.run(run_request)
