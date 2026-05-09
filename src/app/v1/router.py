@@ -37,5 +37,9 @@ async def health_ws(websocket: WebSocket) -> None:
 
             await asyncio.sleep(10)
 
-    except WebSocketDisconnect:
-        print("Client disconnected")
+    except WebSocketDisconnect as exc:
+        logger.bind(
+            event="websocket.disconnect",
+            path=websocket.url.path,
+            close_code=exc.code,
+        ).info("websocket disconnected")
