@@ -3,26 +3,53 @@
 This project is a small FastAPI skeleton for stateless services. The default
 local app port is `5000`.
 
-## Local setup
+## First local run
 
-Install dependencies:
+Walk through these steps in order on a fresh clone. The service listens on
+port `5000` by default.
 
-```bash
-uv sync
-```
+1. **Install dependencies**
 
-Run the service:
+   ```bash
+   uv sync
+   ```
 
-```bash
-make run
-```
+2. **Start the service**
 
-Run checks:
+   ```bash
+   make run
+   ```
 
-```bash
-make test
-make lint
-```
+   Leave this running in one terminal. Uvicorn logs the bound address on
+   startup.
+
+3. **Hit the health endpoints** (in a second terminal)
+
+   ```bash
+   curl -X GET "http://localhost:5000/health" -H "accept: application/json"
+   curl -X GET "http://localhost:5000/v1/health" -H "accept: application/json"
+   ```
+
+   Both should return `200` with a JSON body. Stop the server with Ctrl-C
+   when you're done.
+
+4. **Run the tests**
+
+   ```bash
+   make test
+   ```
+
+   Runs pytest with coverage.
+
+5. **Lint**
+
+   ```bash
+   make lint
+   ```
+
+   Runs `ruff check`. Use `make format` to auto-fix style issues.
+
+## Local configuration
 
 `FASTAPI_ENV` selects a deployment block from `config.toml`. Valid values are
 `DEV`, `STAGE`, `PROD`, and `TEST`. Copy `.env.example` to `.env` when using
