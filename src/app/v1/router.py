@@ -12,13 +12,11 @@ v1 = APIRouter()
 
 @v1.get("/health", response_model=HealthCheckResponse)
 def health_get(request: Request) -> HealthCheckResponse:
-    logger.debug(f"Methode: {request.method} on {request.url.path}")
     return {"version": request.app.state.VERSION, "timestamp": time()}
 
 
 @v1.post("/health", response_model=HealthCheckResponse)
 def health_post(request: Request) -> HealthCheckResponse:
-    logger.debug(f"Methode: {request.method} on {request.url.path}")
     return {"version": request.app.state.VERSION, "timestamp": time()}
 
 
