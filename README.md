@@ -21,6 +21,8 @@ Or via the Makefile:
 make run
 ```
 
+Local environment defaults are documented in `.env.example`.
+
 ## Running service in Docker
 
 To build the Docker image:
@@ -33,6 +35,18 @@ To run the Docker image:
 
 ```
 docker run -p 5000:5000 -ti fastapi-api:latest
+```
+
+Or run the service with Docker Compose:
+
+```
+make up
+```
+
+To stop the Compose services:
+
+```
+make down
 ```
 
 ## Local querying
@@ -73,3 +87,8 @@ make format
 ## Available make targets
 
 Run `make help` to see all available targets.
+
+## Developer onboarding
+
+See `docs/developer-onboarding.md` for local setup notes and the recipe for
+adding a new endpoint or shared resource.
