@@ -46,7 +46,9 @@ class Config(BaseSettings):
     def validate_fastapi_env(cls, value: str) -> str:
         if value not in cls.VALID_FASTAPI_ENVS:
             expected = ", ".join(cls.VALID_FASTAPI_ENVS)
-            raise ValueError(f"Invalid FASTAPI_ENV {value!r}. Expected one of: {expected}")
+            raise ValueError(
+                f"Invalid FASTAPI_ENV {value!r}. Expected one of: {expected}"
+            )
         return value
 
     @classmethod
