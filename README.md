@@ -92,4 +92,5 @@ Run `make help` to see all available targets.
 ## Developer onboarding
 
 See `docs/developer-onboarding.md` for local setup notes and the recipe for
-adding a new endpoint or shared resource.
+adding a new endpoint or shared resource. It also includes the PR/update
+checklist, dependency update flow, and common gotchas.
