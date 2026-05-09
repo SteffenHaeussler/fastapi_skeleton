@@ -1,8 +1,8 @@
 import importlib.metadata
 from pathlib import Path
-from typing import Tuple, Type
+from typing import ClassVar, Tuple, Type
 
-from pydantic import BaseModel, Field, constr
+from pydantic import BaseModel, Field, constr, field_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -27,6 +27,7 @@ class Deployment(BaseModel):
 
 class Config(BaseSettings):
     _toml_file: str = "config.toml"
+    VALID_FASTAPI_ENVS: ClassVar[tuple[str, ...]] = ("DEV", "PROD", "STAGE", "TEST")
 
     FASTAPI_ENV: constr(to_upper=True) = Field(default="DEV")
     BASEDIR: str = str(Path(__file__).resolve().parent)
@@ -39,6 +40,14 @@ class Config(BaseSettings):
     TEST: Deployment
 
     model_config = SettingsConfigDict(toml_file=[_toml_file], env_prefix="")
+
+    @field_validator("FASTAPI_ENV")
+    @classmethod
+    def validate_fastapi_env(cls, value: str) -> str:
+        if value not in cls.VALID_FASTAPI_ENVS:
+            expected = ", ".join(cls.VALID_FASTAPI_ENVS)
+            raise ValueError(f"Invalid FASTAPI_ENV {value!r}. Expected one of: {expected}")
+        return value
 
     @classmethod
     def settings_customise_sources(
@@ -55,5 +64,5 @@ class Config(BaseSettings):
         )
 
     @property
-    def api_mode(self) -> str:
-        return dict(self).get(self.FASTAPI_ENV)
+    def api_mode(self) -> Deployment:
+        return getattr(self, self.FASTAPI_ENV)
