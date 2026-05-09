@@ -21,7 +21,8 @@ Or via the Makefile:
 make run
 ```
 
-Local environment defaults are documented in `.env.example`.
+See `docs/configuration.md` for how `FASTAPI_ENV`, `config.toml`, `.env`, and
+Compose fit together. Local environment defaults are documented in `.env.example`.
 
 ## Running service in Docker
 

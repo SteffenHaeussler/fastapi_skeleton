@@ -70,10 +70,8 @@ port `5000` by default.
 
 ## Local configuration
 
-`FASTAPI_ENV` selects a deployment block from `config.toml`. Valid values are
-`DEV`, `STAGE`, `PROD`, and `TEST`. Copy `.env.example` to `.env` when using
-Docker Compose locally; deployment settings such as `DEBUG` and CORS still live
-in `config.toml`.
+See `docs/configuration.md` for how `FASTAPI_ENV`, `config.toml`, `.env`, and
+Compose fit together, and where each kind of setting belongs.
 
 ## Docker Compose
 
